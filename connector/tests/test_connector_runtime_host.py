@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import Any
+from unittest.mock import AsyncMock
 
 from connector.runtime_protocol import (
     CAPABILITY_CATALOG_MODEL,
@@ -24,6 +25,10 @@ from connector.server.sync_state import JsonSyncStateStore
 
 def test_connector_runtime_host_maps_timeline_item_to_backend_notification() -> None:
     asyncio.run(_exercise_timeline_item_notification())
+
+
+def test_connector_runtime_host_pages_complete_timeline_syncs() -> None:
+    asyncio.run(_exercise_paged_complete_timeline_sync())
 
 
 def test_connector_runtime_host_persists_sync_state(tmp_path) -> None:
@@ -121,6 +126,68 @@ async def _exercise_timeline_item_notification() -> None:
             },
         )
     ]
+
+
+async def _exercise_paged_complete_timeline_sync() -> None:
+    notifications: list[tuple[str, dict[str, Any]]] = []
+    ingest_snapshot = AsyncMock()
+
+    async def notify(method: str, params: dict[str, Any]) -> None:
+        notifications.append((method, params))
+
+    async def download(_session_id: str, _file_id: str) -> tuple[bytes, str, str]:
+        raise AssertionError("unexpected attachment download")
+
+    host = ConnectorRuntimeHost(
+        connector_id="conn_1",
+        notifier=notify,
+        attachment_downloader=download,
+        ingest_snapshot=ingest_snapshot,
+    )
+    await host.timeline_sync(
+        "sess_1",
+        "codex",
+        (_runtime_item(),),
+        external_session_id="thread_1",
+        complete=True,
+        metadata={"runtimeId": "rti_1"},
+    )
+
+    ingest_snapshot.assert_awaited_once()
+    args = ingest_snapshot.await_args.args
+    assert args[:4] == (
+        "codex",
+        "rti_1",
+        "sess_1",
+        {"externalSessionId": "thread_1", "metadata": {"runtimeId": "rti_1"}},
+    )
+    assert tuple(args[4]) == ({
+            "id": "item_1",
+            "sessionId": "sess_1",
+            "type": "message",
+            "status": "done",
+            "content": {"text": "history"},
+            "source": {"runtime": "codex", "itemId": "item_1"},
+            "orderSeq": 1,
+            "revision": 1,
+            "contentHash": "sha256:item",
+        },)
+    assert ingest_snapshot.await_args.kwargs == {"on_progress": None}
+    assert notifications == []
+
+
+def _runtime_item() -> RuntimeTimelineItem:
+    return RuntimeTimelineItem(
+        id="item_1",
+        session_id="sess_1",
+        type="message",
+        status="done",
+        content={"text": "history"},
+        source={"runtime": "codex"},
+        order_seq=1,
+        revision=1,
+        content_hash="sha256:item",
+    )
 
 
 async def _exercise_session_source_notification() -> None:

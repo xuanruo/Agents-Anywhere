@@ -105,6 +105,7 @@
   - 第一页失败时直接报错，只有后续页会重试。
 
   [#332](https://github.com/anywhere-labs/Agents-Anywhere/pull/332)、[#324](https://github.com/anywhere-labs/Agents-Anywhere/pull/324)、[#353](https://github.com/anywhere-labs/Agents-Anywhere/pull/353)
+- Codex 完整历史同步也会按页面上传，单个会话过大时不再因反向代理拒绝请求而反复重试。（[f0c44b5](https://github.com/anywhere-labs/Agents-Anywhere/commit/f0c44b5)）
 - 某个会话的历史被 Server 拒绝时只隔离这个会话，其他会话照常同步。（[#328](https://github.com/anywhere-labs/Agents-Anywhere/pull/328)）
 - 状态上报失败不再结束同步任务，任务意外退出后会自动重建。（[#327](https://github.com/anywhere-labs/Agents-Anywhere/pull/327)）
 - 同步进度只在数据真正写入后才推进，快照和批次按顺序处理；关闭同步时会取消正在进行的上传和重新抓取。（[#353](https://github.com/anywhere-labs/Agents-Anywhere/pull/353)）

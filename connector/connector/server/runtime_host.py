@@ -285,12 +285,25 @@ class ConnectorRuntimeHost(RuntimeHostClient):
         server_items = tuple(
             item for item in items if item.type not in {"turn.start", "turn.end"}
         )
+        if complete and self._ingest_snapshot is not None:
+            await self.publish_runtime_snapshot(
+                runtime,
+                session_id,
+                {
+                    "externalSessionId": external_session_id or session_id,
+                    "metadata": instance_metadata,
+                },
+                (_timeline_item_payload(item) for item in server_items),
+                runtime_id=_runtime_id_from_metadata(instance_metadata),
+            )
+            return
+        server_item_payloads = tuple(_timeline_item_payload(item) for item in server_items)
         payload: dict[str, Any] = {
             "sessionId": session_id,
             "runtime": runtime,
             "runtimeId": _runtime_id_from_metadata(instance_metadata),
             "externalSessionId": external_session_id,
-            "items": [_timeline_item_payload(item) for item in server_items],
+            "items": list(server_item_payloads),
             "complete": complete,
             "metadata": instance_metadata,
         }
