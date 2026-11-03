@@ -21,6 +21,7 @@ import { RecentSessionsSection } from "@/components/sidebar/recent-sessions-sect
 import {
   filterProjectSessions,
   resolveProjectIdentity,
+  sidebarIdentityParts,
   sessionIdentityLabel,
 } from "@/components/sidebar/project-identity"
 import {
@@ -119,13 +120,7 @@ export function AppSidebar({ contained = false }: { contained?: boolean }) {
     && regularProjects.length === 0
     && projectsWithoutDeviceAgentFilter.length > 0
 
-  // A row only shows the dimension that is actually filtered: with "all
-  // devices" the device name stays off, with "all Agents" the Agent stays off,
-  // and with both on "all" the row keeps its original single line.
-  const identityParts = React.useMemo(() => ({
-    includeDevice: filter.connectorId !== "all",
-    includeAgents: filter.runtime !== "all",
-  }), [filter.connectorId, filter.runtime])
+  const identityParts = React.useMemo(() => sidebarIdentityParts(filter), [filter])
 
   const sessionsForProject = React.useCallback(
     (projectId: string, status: ProjectSessionStatusFilter = "active") => selectProjectSessions(

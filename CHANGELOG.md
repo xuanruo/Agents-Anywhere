@@ -138,6 +138,7 @@
 
 ### Web 与 Desktop 界面
 
+- 「全部设备」视图中的项目行会显示所属设备名称；按 Agent 筛选时显示对应的 Runtime 实例名称，同名项目也能直接区分。（[#503](https://github.com/anywhere-labs/Agents-Anywhere/issues/503)）
 - 管理看板重做：
   - 新增概览、用户、使用量、设备与 Runtime、运行质量视图；
   - 支持选择时间范围，并显示实时指标；

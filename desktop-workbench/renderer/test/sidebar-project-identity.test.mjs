@@ -9,6 +9,7 @@ const {
   projectIdentityLabel,
   projectMatchesDeviceAgentFilter,
   resolveProjectIdentity,
+  sidebarIdentityParts,
   sessionIdentityLabel,
 } = await import("../src/components/sidebar/project-identity.ts")
 const { projectHasVisibleSessions } = await import("../src/components/sidebar/project-visibility.ts")
@@ -48,8 +49,8 @@ const agent = (runtime, label, sessionCount) => ({ runtime, label, sessionCount 
 
 test("identity resolves the device, workspace and deduplicated Agents with counts", () => {
   const sessions = [
-    session("p1", "codex", { runtimeTypeDisplayName: "Codex" }),
-    session("p1", "codex"),
+    session("p1", "codex", { runtimeId: "codex-personal", runtimeName: "Personal Codex", runtimeTypeDisplayName: "Codex" }),
+    session("p1", "codex", { runtimeId: "codex-personal", runtimeName: "Personal Codex" }),
     session("p1", "claude", { runtimeTypeDisplayName: "Claude Code" }),
     session("p1", "dsh", { runtimeTypeDisplayName: null }),
     session("p2", "claude"),
@@ -60,7 +61,7 @@ test("identity resolves the device, workspace and deduplicated Agents with count
   assert.equal(identity.deviceOs, "macos")
   assert.equal(identity.workspacePath, "/work/p1")
   assert.deepEqual(identity.agents, [
-    agent("codex", "Codex", 2),
+    agent("codex-personal", "Personal Codex", 2),
     agent("claude", "Claude Code", 1),
     agent("dsh", "DeepSeek Harness", 1),
   ])
@@ -94,6 +95,28 @@ test("the compact label carries the device, the primary Agent and a +N suffix", 
     "Codex",
   )
   assert.equal(projectIdentityLabel({ ...base, deviceName: "  ", agents: [] }), null)
+})
+
+test("all-device project rows keep device identity for same-named projects", () => {
+  const firstIdentity = resolveProjectIdentity(
+    project("p1", { name: "api" }),
+    [session("p1", "codex")],
+    [connector("conn-a", "MacBook Pro")],
+  )
+  const secondIdentity = resolveProjectIdentity(
+    project("p2", { name: "api", connectorId: "conn-b" }),
+    [session("p2", "codex", { connectorId: "conn-b" })],
+    [connector("conn-b", "Build Box", "linux")],
+  )
+  const parts = sidebarIdentityParts(all)
+
+  assert.equal(projectIdentityLabel(firstIdentity, parts), "MacBook Pro")
+  assert.equal(projectIdentityLabel(secondIdentity, parts), "Build Box")
+  assert.deepEqual(parts, { includeDevice: true, includeAgents: false })
+  assert.deepEqual(sidebarIdentityParts({ connectorId: "all", runtime: "codex" }), {
+    includeDevice: true,
+    includeAgents: true,
+  })
 })
 
 test("the device/Agent gate matches device only, Agent only, both and neither", () => {
@@ -167,7 +190,7 @@ test("an expanded project hides the sessions of other devices and Agents", () =>
   )
 })
 
-test("a row label only carries the dimensions that are filtered", () => {
+test("the identity formatter includes only the requested parts", () => {
   const identity = {
     deviceName: "MacBook Pro",
     deviceOs: "macos",
@@ -175,7 +198,7 @@ test("a row label only carries the dimensions that are filtered", () => {
     agents: [agent("codex", "Codex", 2), agent("claude", "Claude Code", 1)],
   }
 
-  // 全部设备 + 全部 Agent：不出这一行
+  // No identity parts requested: the generic formatter has no second line.
   assert.equal(projectIdentityLabel(identity, { includeDevice: false, includeAgents: false }), null)
   // 具体设备 + 全部 Agent：只有设备名
   assert.equal(projectIdentityLabel(identity, { includeDevice: true, includeAgents: false }), "MacBook Pro")
@@ -196,6 +219,10 @@ test("session rows and workspace flags keep device and Agent identity available"
   assert.equal(
     sessionIdentityLabel(session("p1", "codex", { runtimeTypeDisplayName: "Codex" }), connectors),
     "MacBook Pro · Codex",
+  )
+  assert.equal(
+    sessionIdentityLabel(session("p1", "codex", { runtimeName: "Personal Codex", runtimeTypeDisplayName: "Codex" }), connectors),
+    "MacBook Pro · Personal Codex",
   )
   assert.equal(
     sessionIdentityLabel(session("p1", "dsh", { connectorId: "conn-b" }), connectors),

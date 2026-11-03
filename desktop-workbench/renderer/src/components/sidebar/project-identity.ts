@@ -13,6 +13,8 @@ export type DeviceAgentFilter = Pick<FilterValue, "connectorId" | "runtime">
 type FilterableSession = {
   connectorId?: string
   runtime?: string
+  runtimeId?: string | null
+  runtimeName?: string | null
 }
 
 type ProjectSession = FilterableSession & {
@@ -50,19 +52,20 @@ export function resolveProjectIdentity(
   connectors: readonly IdentityConnector[],
 ): ProjectIdentity {
   const connector = connectors.find((item) => item.id === project.connectorId)
-  const groups = new Map<string, { displayName: string | null; sessionCount: number }>()
+  const groups = new Map<string, { displayName: string | null; runtimeType: string; sessionCount: number }>()
   for (const session of sessions) {
     if (session.projectId !== project.id || !session.runtime) continue
-    const group = groups.get(session.runtime) ?? { displayName: null, sessionCount: 0 }
-    const displayName = session.runtimeTypeDisplayName?.trim()
+    const runtimeId = session.runtimeId?.trim() || session.runtime
+    const group = groups.get(runtimeId) ?? { displayName: null, runtimeType: session.runtime, sessionCount: 0 }
+    const displayName = session.runtimeName?.trim() || session.runtimeTypeDisplayName?.trim()
     if (displayName && !group.displayName) group.displayName = displayName
     group.sessionCount += 1
-    groups.set(session.runtime, group)
+    groups.set(runtimeId, group)
   }
 
-  const agents = Array.from(groups, ([runtime, group]) => ({
-    runtime,
-    label: group.displayName || runtimeLabel(runtime),
+  const agents = Array.from(groups, ([runtimeId, group]) => ({
+    runtime: runtimeId,
+    label: group.displayName || runtimeLabel(group.runtimeType),
     sessionCount: group.sessionCount,
   })).sort((left, right) => (
     right.sessionCount - left.sessionCount
@@ -78,15 +81,17 @@ export function resolveProjectIdentity(
   }
 }
 
-/**
- * Which halves of the identity belong on the row. A dimension is only shown
- * while that filter is narrowing the list: with "all devices" the device name
- * stays off, with "all Agents" the Agent name stays off, and with both on "all"
- * the row has no second line at all.
- */
+/** Which identity parts a row should render. */
 export type IdentityParts = {
   includeDevice?: boolean
   includeAgents?: boolean
+}
+
+export function sidebarIdentityParts(filter?: DeviceAgentFilter | null): IdentityParts {
+  return {
+    includeDevice: true,
+    includeAgents: filter != null && filter.runtime !== "all",
+  }
 }
 
 /**
@@ -119,7 +124,7 @@ export function sessionIdentityLabel(
       || "").trim()
     : ""
   const label = (options.includeAgents ?? true) && session.runtime
-    ? session.runtimeTypeDisplayName?.trim() || runtimeLabel(session.runtime)
+    ? session.runtimeName?.trim() || session.runtimeTypeDisplayName?.trim() || runtimeLabel(session.runtime)
     : ""
   const parts = [deviceName, label].filter(Boolean)
   return parts.length > 0 ? parts.join(" · ") : null
